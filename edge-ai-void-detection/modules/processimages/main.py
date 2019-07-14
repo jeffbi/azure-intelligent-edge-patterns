@@ -121,16 +121,16 @@ def parse_module_twin(twin):
         camera_id = id
         print("Set camera_id to {}".format(camera_id))
 
-def make_storage_filename(time=None):
+def make_time_string(time=None):
     if time is None:
         time = datetime.utcnow()
     return datetime.utcnow().isoformat(time="milliseconds") + 'Z'
 
 def send_iot_hub_message(hub_manager, message_dict, schema):
-    message_dict["CreationTimeUtc"] = datetime.utcnow().isoformat(timespec="seconds") + 'Z'
-    message_dict["MessageSchema"] = schema
     message = json.dumps(message_dict)
     message = IoTHubMessage(message)
+    message.properties["iothub-message-schema"] = schema
+    message.properties["iothub-creation-time-utc"] = datetime.utcnow().isoformat(timespec="milliseconds") + 'Z'
     hub_manager.client.send_event_async("output1", message, send_confirmation_callback, 0)
 
 
@@ -178,7 +178,7 @@ def score_single_image(hub_manager, file_path):
                 for i in range(len(processed_results["classes"])):
                     message = {}
                     message["cameraId"] = camera_id
-                    message["time"] = camera_time.isoformat(timespec="seconds") + 'Z'
+                    message["time"] = make_time_string(camera_time)
                     message["cls"] = processed_results["classes"][i]
                     message["score"] = processed_results["scores"][i]
                     message["bbymin"] = processed_results["bboxes"][i][0]
@@ -191,7 +191,7 @@ def score_single_image(hub_manager, file_path):
                     print("Reading original image")
                     with open(file_path, "rb") as file:
                         img = file.read()
-                    name = make_storage_filename(camera_time)
+                    name = make_time_string(camera_time)
                     ext = os.path.splitext(file_path)[1]
                     print("Uploading image to storage: camera id: {}, name: {}, extension: {}".format(camera_id, name, ext))
                     blob_uploader.upload(camera_id, name, ext, img)
@@ -199,7 +199,7 @@ def score_single_image(hub_manager, file_path):
                     print("Building upload message")
                     message = {}
                     message["cameraId"] = camera_id
-                    message["time"] = camera_time.isoformat(timespec="seconds") + 'Z'
+                    message["time"] = make_time_string(camera_time)
                     message["type"] = ext
                     message["procType"] = "FPGA"
                     message["procMsec"] = (time.time() - start) * 1000.0
